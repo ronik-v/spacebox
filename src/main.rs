@@ -1,3 +1,10 @@
+mod config;
+mod controllers;
+mod repositories;
+mod services;
+mod core;
+mod data;
+
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 
 use axum::Router;
