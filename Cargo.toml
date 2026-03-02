@@ -6,12 +6,16 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8.8", features = ["macros"]}
 sqlx = { version =  "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
+redis = { version = "0.29.1", features = ["tokio-comp", "connection-manager"] }
 tokio = { version =  "1.49.0", features = ["rt-multi-thread", "full"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 utoipa = { version = "5.4.0", features = ["axum_extras"]}
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 tower-http = { version = "0.6.8", features = ["cors", "trace", "request-id"] }
 uuid = { version = "1", features = ["v4"] }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1.0.140"
 envy = "0.4.2"
 dotenvy = "0.15.7"
 anyhow = "1.0.102"
