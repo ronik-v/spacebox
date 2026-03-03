@@ -4,6 +4,8 @@ mod repositories;
 mod services;
 mod core;
 mod models;
+mod responses;
+mod dto;
 
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use std::sync::Arc;

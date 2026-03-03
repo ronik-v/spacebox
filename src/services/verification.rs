@@ -8,7 +8,7 @@ use redis::cmd;
 use sha2::{Digest, Sha256};
 
 use crate::config::AppConfig;
-use crate::core::constants::{EMAIL_HTML_BODY_TEMPLATE, EMAIL_SUBJECT_TEMPLATE, TTL_MINUTES};
+use crate::core::email::constants::{EMAIL_HTML_BODY_TEMPLATE, EMAIL_SUBJECT_TEMPLATE, TTL_MINUTES};
 use crate::core::email::send::EmailSender;
 
 #[derive(Clone)]
