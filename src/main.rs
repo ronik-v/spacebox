@@ -6,6 +6,7 @@ mod core;
 mod data;
 
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::sync::Arc;
 
 use axum::Router;
 use anyhow::Result;
@@ -35,7 +36,7 @@ async fn main() -> Result<()> {
     let db_connection = create_connection_db(&cfg).await?;
     let redis_connection = create_connection_redis(&cfg).await?;
 
-    let app_state = AppState { db: db_connection, redis: redis_connection };
+    let app_state = AppState { db: db_connection, redis: Arc::new(redis_connection) };
 
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info".to_string()));

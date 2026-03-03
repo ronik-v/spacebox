@@ -20,3 +20,6 @@ envy = "0.4.2"
 dotenvy = "0.15.7"
 anyhow = "1.0.102"
 tracing = "0.1.44"
+lettre = { version = "0.11.15", features = ["smtp-transport", "builder", "tokio1", "native-tls", "tokio1-native-tls" ] }
+hex = "0.4.3"
+sha2 = "0.10.9"
