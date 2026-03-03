@@ -20,6 +20,9 @@ use utoipa_swagger_ui::SwaggerUi;
 use tracing_subscriber::EnvFilter;
 use tower_http::trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse};
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
+use crate::core::database::connection::{create_connection_db, create_connection_redis};
+
+use crate::core::state::AppState;
 
 async fn root() -> &'static str {
     "hello"
@@ -27,6 +30,13 @@ async fn root() -> &'static str {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // state params
+    let cfg = config::AppConfig::from_env();
+    let db_connection = create_connection_db(&cfg).await?;
+    let redis_connection = create_connection_redis(&cfg).await?;
+
+    let app_state = AppState { db: db_connection, redis: redis_connection };
+
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info".to_string()));
     tracing_subscriber::fmt()
@@ -55,7 +65,9 @@ async fn main() -> Result<()> {
                         .level(tracing::Level::INFO)
                         .latency_unit(LatencyUnit::Millis),
                 ),
-        );
+        )
+        .with_state(app_state);
+
     let ip: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let addr = SocketAddr::new(ip, 9099);
     println!("Listening on http://{}", addr);
