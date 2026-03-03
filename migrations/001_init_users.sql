@@ -14,3 +14,18 @@ CREATE TABLE IF NOT EXISTS user_tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Format of user basic folder
+CREATE OR REPLACE FUNCTION init_user_folder_func()
+RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.base_folder := NEW.id || '_' || NEW.email || ':';
+        RETURN NEW;
+    END;
+$$ LANGUAGE plpgsql;
+
+-- Init base folder in db
+CREATE OR REPLACE TRIGGER init_user_folder
+    BEFORE INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION init_user_folder_func();

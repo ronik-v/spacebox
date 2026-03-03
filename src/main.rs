@@ -3,7 +3,7 @@ mod controllers;
 mod repositories;
 mod services;
 mod core;
-mod data;
+mod models;
 
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use std::sync::Arc;
