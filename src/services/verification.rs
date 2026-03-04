@@ -4,7 +4,6 @@ use anyhow::Result;
 use chrono::{Datelike, Utc};
 use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
-use redis::cmd;
 use sha2::{Digest, Sha256};
 
 use crate::config::AppConfig;
@@ -37,7 +36,7 @@ impl <'a>RegistrationVerification<'a> {
             &self.cfg, &self.email_recipient, ver_subject, html_body_message
         );
 
-        email_sender.send().await.map_err(|e| anyhow::anyhow!(e))?;
+        email_sender.send().await?;
         Ok(())
     }
 
@@ -46,7 +45,7 @@ impl <'a>RegistrationVerification<'a> {
         let code_lifetime = (TTL_MINUTES * 60) as u64;
         let key = self.make_key();
 
-        conn.set_ex::<_, _, u64>(key, self.verification_code.to_string(), code_lifetime).await?;
+        conn.set_ex::<_, _, ()>(key, self.verification_code.to_string(), code_lifetime).await?;
 
         Ok(())
     }
@@ -54,14 +53,16 @@ impl <'a>RegistrationVerification<'a> {
     pub async fn is_correct_verification_code(&self) -> Result<bool> {
         let mut conn = (*self.redis).clone();
         let key = self.make_key();
-        let stored: Option<String> = cmd("GETDEL").arg(&key).query_async(&mut conn).await?;
+        let stored: Option<String> = conn.get(&key.as_str()).await?;
 
-        Ok(
-            match stored {
-             Some(v) => v == self.verification_code,
-             None => false,
-            }
-        )
+        let is_correct = stored
+            .as_deref()
+            .map_or(false, |v| v == self.verification_code);
+        if is_correct {
+            let _: () = conn.del(&key.as_str()).await?;
+        }
+
+        Ok(is_correct)
     }
 
     fn make_key(&self) -> String {

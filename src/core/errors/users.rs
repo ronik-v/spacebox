@@ -1,3 +1,9 @@
 pub const USER_IS_EXISTS_ERROR: &str = "Пользователь с таким email уже существует";
 pub const UNCORRECTED_VERIFICATION_CODE_ERROR: &str = "Код верификации не совпал попробуйте ввести его еще раз";
-pub const AUTH_ERROR: &str = "Ошибка авторизации";
+pub const INVALID_CREDENTIALS_ERROR: &str = "Неверный email или пароль";
+pub const FAILED_SEND_CODE_ERROR: &str = "Не удалось отправить код верификации";
+pub const FAILED_STORE_CODE_ERROR: &str = "Не удалось сохранить код верификации";
+pub const FAILED_CREATE_USER_ERROR: &str = "Не удалось создать пользователя";
+pub const FAILED_CREATE_TOKEN_ERROR: &str = "Не удалось создать токен";
+pub const DB_ERROR: &str = "Ошибка базы данных";
+pub const VERIFICATION_ERROR: &str = "Ошибка верификации";

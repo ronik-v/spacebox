@@ -23,41 +23,37 @@ use utoipa_swagger_ui::SwaggerUi;
 use tracing_subscriber::EnvFilter;
 use tower_http::trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse};
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
+use crate::controllers::auth::auth_routes;
 use crate::core::database::connection::{create_connection_db, create_connection_redis};
 
 use crate::core::state::AppState;
 
-async fn root() -> &'static str {
-    "hello"
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // state params
-    let cfg = config::AppConfig::from_env();
-    let db_connection = create_connection_db(&cfg).await?;
-    let redis_connection = create_connection_redis(&cfg).await?;
-
-    let app_state = AppState { db: db_connection, redis: Arc::new(redis_connection) };
-
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info".to_string()));
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
         .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
         .init();
+    // state params
+    let cfg = config::AppConfig::from_env();
+    let db_connection = create_connection_db(&cfg).await?;
+    let redis_connection = create_connection_redis(&cfg).await?;
 
+    let app_state = AppState { cfg: Arc::new(cfg), db: db_connection, redis: Arc::new(redis_connection) };
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::PUT, Method::DELETE])
         .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCEPT, HeaderName::from_static("x-requested-with")])
         .allow_credentials(true);
 
     let app = Router::new()
-        .route("/", get(root))
         .merge(
             SwaggerUi::new("/swagger-ui")
                 .url("/api-doc/openapi.json", ApiDoc::openapi()),
         )
+        .merge(auth_routes())
         .layer(cors)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .layer(
@@ -81,5 +77,11 @@ async fn main() -> Result<()> {
 }
 
 #[derive(OpenApi)]
-#[openapi()]
+#[openapi(
+    paths(
+        crate::controllers::auth::login,
+        crate::controllers::auth::send_verification_code,
+        crate::controllers::auth::confirm_registration
+    )
+)]
 pub struct ApiDoc;

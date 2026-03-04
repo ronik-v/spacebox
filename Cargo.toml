@@ -23,3 +23,6 @@ tracing = "0.1.44"
 lettre = { version = "0.11.15", features = ["smtp-transport", "builder", "tokio1", "native-tls", "tokio1-native-tls" ] }
 hex = "0.4.3"
 sha2 = "0.10.9"
+rand = "0.8.5"
+http = "1.4.0"
+config = "0.15.11"

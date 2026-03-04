@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS user_tokens (
 CREATE OR REPLACE FUNCTION init_user_folder_func()
 RETURNS TRIGGER AS $$
     BEGIN
-        NEW.base_folder := NEW.id || '_' || NEW.email || ':';
+        NEW.base_folder := NEW.id || '_' || NEW.email;
         RETURN NEW;
     END;
 $$ LANGUAGE plpgsql;

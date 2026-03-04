@@ -29,6 +29,13 @@ impl<'a> UsersRepository<'a> {
             .await
     }
 
+    pub async fn get_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(self.db)
+            .await
+    }
+
     pub async fn get_by_token(&self, token: &String) -> Result<UserShort, Error> {
         sqlx::query_as::<_, UserShort>(
             "SELECT u.id, u.email, u.base_folder FROM users u JOIN user_tokens ut ON u.id = ut.user_id WHERE ut.token = $1"
