@@ -1,8 +1,7 @@
-use uuid::Uuid;
-
 use crate::core::api::ApiResponse;
 use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, INVALID_CREDENTIALS_ERROR};
 use crate::core::state::AppState;
+use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
 use crate::repositories::users::UsersRepository;
 use crate::responses::users::UserOut;
@@ -20,7 +19,7 @@ impl AuthService {
 
         match repo.get_by_email_password(&email, &password).await {
             Ok(Some(user)) => {
-                let token = Uuid::new_v4().hyphenated().to_string();
+                let token = get_auth_token();
 
                 match repo.create_token(&user.id, &token).await {
                     Ok(user_token) => {

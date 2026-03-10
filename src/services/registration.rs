@@ -1,9 +1,9 @@
 use rand::{Rng, thread_rng};
-use uuid::Uuid;
 
 use crate::core::api::ApiResponse;
 use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, FAILED_CREATE_USER_ERROR, FAILED_SEND_CODE_ERROR, FAILED_STORE_CODE_ERROR, UNCORRECTED_VERIFICATION_CODE_ERROR, USER_IS_EXISTS_ERROR, VERIFICATION_ERROR};
 use crate::core::state::AppState;
+use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
 use crate::repositories::users::UsersRepository;
 use crate::responses::users::UserOut;
@@ -78,7 +78,7 @@ impl RegistrationService {
 
                 match repo.add(&email, &password).await {
                     Ok(Some(user)) => {
-                        let token = Uuid::new_v4().hyphenated().to_string();
+                        let token = get_auth_token();
 
                         match repo.create_token(&user.id, &token).await {
                             Ok(user_token) => {
