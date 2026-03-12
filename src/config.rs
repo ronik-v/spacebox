@@ -13,7 +13,8 @@ pub struct AppConfig {
     pub email_sender: String,
     pub email_sender_password: String,
     pub email_smtp_server: String,
-    pub email_smtp_port: Option<u16>
+    pub email_smtp_port: Option<u16>,
+    pub root_dir: String,
 }
 
 impl AppConfig {
