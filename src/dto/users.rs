@@ -6,7 +6,6 @@ use utoipa::ToSchema;
 pub struct UserDto {
     pub id: i64,
     pub email: String,
-    pub base_folder: Option<String>,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: NaiveDateTime,
 }
@@ -15,7 +14,6 @@ pub struct UserDto {
 pub struct UserShortDto {
     pub id: i64,
     pub email: String,
-    pub base_folder: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]

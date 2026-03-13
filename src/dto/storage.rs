@@ -1,23 +1,27 @@
 use chrono::{DateTime, Utc};
+use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DirDto {
     pub id: i64,
     pub user_dir_id: i64,
     pub name: String,
     pub parent_id: Option<i64>,
     pub role: String,
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TagDto {
     pub id: i64,
     pub name: String,
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FileDto {
     pub id: i64,
     pub name: String,
@@ -25,11 +29,12 @@ pub struct FileDto {
     pub mime_type: Option<String>,
     pub storage_key: String,
     pub hash: String,
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     pub tags: Vec<TagDto>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct UserDirCreateResult {
     pub user_dir_id: i64,
     pub dir: DirDto,

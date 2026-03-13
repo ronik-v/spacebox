@@ -6,5 +6,6 @@ use crate::config::AppConfig;
 pub struct AppState {
     pub cfg: Arc<AppConfig>,
     pub db: sqlx::PgPool,
-    pub redis: Arc<ConnectionManager>
+    pub redis: Arc<ConnectionManager>,
+    pub storage_root: std::path::PathBuf,
 }

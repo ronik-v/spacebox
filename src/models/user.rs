@@ -7,15 +7,13 @@ pub struct User {
     pub id: i64,
     pub email: String,
     pub password: String,
-    pub base_folder: Option<String>,
     pub created_at: NaiveDateTime
 }
 
 #[derive(Debug, Serialize, FromRow)]
 pub struct UserShort {
     pub id: i64,
-    pub email: String,
-    pub base_folder: Option<String>
+    pub email: String
 }
 
 #[derive(Debug, Serialize, FromRow)]

@@ -26,7 +26,6 @@ impl AuthService {
                         let user_dto = UserDto {
                             id: user.id,
                             email: user.email,
-                            base_folder: user.base_folder,
                             created_at: user.created_at,
                         };
 

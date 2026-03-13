@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = { version = "0.8.8", features = ["macros", "multipart"]}
-sqlx = { version =  "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
+sqlx = { version =  "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "chrono", "macros", "sqlx-macros"] }
 redis = { version = "0.29.1", features = ["tokio-comp", "connection-manager"] }
 tokio = { version =  "1.49.0", features = ["rt-multi-thread", "full"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }

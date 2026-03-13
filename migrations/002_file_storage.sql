@@ -65,3 +65,22 @@ CREATE TABLE IF NOT EXISTS shares (
     CONSTRAINT shares_shared_with_user_id FOREIGN KEY (shared_with_user_id) REFERENCES users(id),
     UNIQUE (resource_type, resource_id, shared_with_user_id)
 );
+
+CREATE OR REPLACE FUNCTION init_user_folder_func()
+RETURNS TRIGGER AS $$
+    DECLARE
+        root_dir_id BIGINT;
+    BEGIN
+        INSERT INTO dirs (name, parent_id)
+        VALUES (NEW.id || '_' || NEW.email, NULL)
+        RETURNING id INTO root_dir_id;
+        INSERT INTO user_dirs (user_id, dir_id, role)
+        VALUES (NEW.id, root_dir_id, 'OWNER');
+        RETURN NEW;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER init_user_folder
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION init_user_folder_func();

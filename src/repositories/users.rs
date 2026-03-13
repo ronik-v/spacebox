@@ -38,7 +38,7 @@ impl<'a> UsersRepository<'a> {
 
     pub async fn get_by_token(&self, token: &String) -> Result<UserShort, Error> {
         sqlx::query_as::<_, UserShort>(
-            "SELECT u.id, u.email, u.base_folder FROM users u JOIN user_tokens ut ON u.id = ut.user_id WHERE ut.token = $1"
+            "SELECT u.id, u.email FROM users u JOIN user_tokens ut ON u.id = ut.user_id WHERE ut.token = $1"
         )
             .bind(token)
             .fetch_one(self.db)

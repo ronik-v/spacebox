@@ -23,7 +23,9 @@ use utoipa_swagger_ui::SwaggerUi;
 use tracing_subscriber::EnvFilter;
 use tower_http::trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse};
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
+
 use crate::controllers::auth::auth_routes;
+use crate::controllers::storage::storage_routes;
 use crate::core::database::connection::{create_connection_db, create_connection_redis};
 
 use crate::core::state::AppState;
@@ -42,7 +44,7 @@ async fn main() -> Result<()> {
     let db_connection = create_connection_db(&cfg).await?;
     let redis_connection = create_connection_redis(&cfg).await?;
 
-    let app_state = AppState { cfg: Arc::new(cfg), db: db_connection, redis: Arc::new(redis_connection) };
+    let app_state = AppState { cfg: Arc::new(cfg.clone()), db: db_connection, redis: Arc::new(redis_connection), storage_root: std::path::PathBuf::from(cfg.root_dir.as_str()) };
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::PUT, Method::DELETE])
         .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCEPT, HeaderName::from_static("x-requested-with")])
@@ -54,6 +56,7 @@ async fn main() -> Result<()> {
                 .url("/api-doc/openapi.json", ApiDoc::openapi()),
         )
         .merge(auth_routes())
+        .merge(storage_routes())
         .layer(cors)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .layer(
@@ -81,7 +84,12 @@ async fn main() -> Result<()> {
     paths(
         crate::controllers::auth::login,
         crate::controllers::auth::send_verification_code,
-        crate::controllers::auth::confirm_registration
+        crate::controllers::auth::confirm_registration,
+        crate::controllers::storage::upload_file,
+        crate::controllers::storage::remove_file,
+        crate::controllers::storage::create_directory,
+        crate::controllers::storage::remove_directory,
+        crate::controllers::storage::rename_directory
     )
 )]
 pub struct ApiDoc;
