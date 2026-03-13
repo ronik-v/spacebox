@@ -27,6 +27,7 @@ use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
 use crate::controllers::auth::auth_routes;
 use crate::controllers::storage::storage_routes;
 use crate::core::database::connection::{create_connection_db, create_connection_redis};
+use crate::core::security::SecurityAddon;
 
 use crate::core::state::AppState;
 
@@ -90,6 +91,10 @@ async fn main() -> Result<()> {
         crate::controllers::storage::create_directory,
         crate::controllers::storage::remove_directory,
         crate::controllers::storage::rename_directory
+    ),
+    modifiers(&SecurityAddon),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub struct ApiDoc;

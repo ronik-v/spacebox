@@ -58,6 +58,12 @@ pub fn storage_routes() -> Router<AppState> {
         )
 }
 
+#[derive(serde::Deserialize, utoipa::ToSchema)]
+pub struct UploadForm {
+    #[schema(format = Binary, content_media_type = "application/octet-stream")]
+    pub file: String,
+}
+
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct UploadQuery {
     pub dir_id: i64,
@@ -80,11 +86,18 @@ pub struct DirRenameRequest {
     params(
         ("dir_id" = i64, Query, description = "ID директории (user_dir_id) для загрузки файла")
     ),
-    request_body(content_type = "multipart/form-data", description = "Файл для загрузки"),
+    request_body(
+        content = UploadForm,
+        content_type = "multipart/form-data",
+        description = "Форма для загрузки файла"
+    ),
     responses(
         (status = 200, description = "Файл успешно загружен", body = ApiResponse<FileDto>),
         (status = 400, description = "Ошибка загрузки", body = ApiResponse<String>),
         (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub async fn upload_file(
@@ -135,6 +148,9 @@ pub async fn upload_file(
         (status = 200, description = "Файл успешно удален", body = ApiResponse<String>),
         (status = 400, description = "Ошибка удаления", body = ApiResponse<String>),
         (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub async fn remove_file(
@@ -185,6 +201,9 @@ pub async fn remove_file(
         (status = 200, description = "Директория успешно создана", body = ApiResponse<UserDirCreateResult>),
         (status = 400, description = "Ошибка создания", body = ApiResponse<String>),
         (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub async fn create_directory(
@@ -234,6 +253,9 @@ pub async fn create_directory(
         (status = 200, description = "Директория успешно удалена", body = ApiResponse<String>),
         (status = 400, description = "Ошибка удаления", body = ApiResponse<String>),
         (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub async fn remove_directory(
@@ -287,6 +309,9 @@ pub async fn remove_directory(
         (status = 200, description = "Директория успешно переименована", body = ApiResponse<DirDto>),
         (status = 400, description = "Ошибка переименования", body = ApiResponse<String>),
         (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
     )
 )]
 pub async fn rename_directory(
