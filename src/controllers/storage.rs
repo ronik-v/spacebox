@@ -1,8 +1,6 @@
 use axum::{
     extract::{State, Json, Query, Path, Multipart},
     http::HeaderMap,
-    http::StatusCode,
-    response::IntoResponse,
     routing::{post, delete, patch},
     Router,
 };
@@ -16,7 +14,6 @@ use crate::{
         token::TokenExtractManager,
     },
     dto::storage::{FileDto, UserDirCreateResult, DirDto},
-    models::user::UserShort,
     repositories::users::UsersRepository,
     services::storage::StorageService,
 };
@@ -100,40 +97,42 @@ pub struct DirRenameRequest {
         ("bearerAuth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn upload_file(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(query): Query<UploadQuery>,
     multipart: Multipart,
-) -> impl IntoResponse {
+) -> ApiResponse<FileDto> {
     let token_manager = TokenExtractManager::new(headers);
 
     let token = match token_manager.check_token_error() {
         Ok(t) => t,
-        Err((status, json_error)) => return (status, json_error).into_response(),
+        Err(_) => {
+            return ApiResponse::<FileDto>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let users_repo = UsersRepository::new(&state.db);
 
     let user_short = match users_repo.get_by_token(&token).await {
         Ok(u) => u,
-        Err(_) => return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiError {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(_) => {
+            return ApiResponse::<FileDto>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
     match storage_service.upload_file(multipart, "", query.dir_id).await {
-        Ok(data) => ApiResponse::Success { data }.into_response(),
-        Err(msg) => ApiResponse::<String>::Error {
+        Ok(data) => ApiResponse::Success { data },
+        Err(msg) => ApiResponse::<FileDto>::Error {
             error: ApiError { message: msg },
-        }
-            .into_response(),
+        },
     }
 }
 
@@ -153,42 +152,41 @@ pub async fn upload_file(
         ("bearerAuth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn remove_file(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(file_id): Path<i64>,
-) -> impl IntoResponse {
+) -> ApiResponse<String> {
     let token_manager = TokenExtractManager::new(headers);
 
     let token = match token_manager.check_token_error() {
         Ok(t) => t,
-        Err((status, json_error)) => return (status, json_error).into_response(),
+        Err(_) => {
+            return ApiResponse::<String>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let users_repo = UsersRepository::new(&state.db);
 
     let user_short = match users_repo.get_by_token(&token).await {
         Ok(u) => u,
-        Err(_) => return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiError {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(_) => {
+            return ApiResponse::<String>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
     match storage_service.remove_file(file_id).await {
-        Ok(_) => ApiResponse::Success {
-            data: "deleted".to_string(),
-        }
-            .into_response(),
+        Ok(_) => ApiResponse::Success { data: "deleted".to_string() },
         Err(msg) => ApiResponse::<String>::Error {
             error: ApiError { message: msg },
-        }
-            .into_response(),
+        },
     }
 }
 
@@ -206,39 +204,41 @@ pub async fn remove_file(
         ("bearerAuth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn create_directory(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(payload): Json<DirCreateRequest>,
-) -> impl IntoResponse {
+) -> ApiResponse<UserDirCreateResult> {
     let token_manager = TokenExtractManager::new(headers);
 
     let token = match token_manager.check_token_error() {
         Ok(t) => t,
-        Err((status, json_error)) => return (status, json_error).into_response(),
+        Err(_) => {
+            return ApiResponse::<UserDirCreateResult>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let users_repo = UsersRepository::new(&state.db);
 
     let user_short = match users_repo.get_by_token(&token).await {
         Ok(u) => u,
-        Err(_) => return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiError {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(_) => {
+            return ApiResponse::<UserDirCreateResult>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
     match storage_service.create_dir(&payload.name).await {
-        Ok(data) => ApiResponse::Success { data }.into_response(),
-        Err(msg) => ApiResponse::<String>::Error {
+        Ok(data) => ApiResponse::Success { data },
+        Err(msg) => ApiResponse::<UserDirCreateResult>::Error {
             error: ApiError { message: msg },
-        }
-            .into_response(),
+        },
     }
 }
 
@@ -258,42 +258,41 @@ pub async fn create_directory(
         ("bearerAuth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn remove_directory(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(dir_id): Path<i64>,
-) -> impl IntoResponse {
+) -> ApiResponse<String> {
     let token_manager = TokenExtractManager::new(headers);
 
     let token = match token_manager.check_token_error() {
         Ok(t) => t,
-        Err((status, json_error)) => return (status, json_error).into_response(),
+        Err(_) => {
+            return ApiResponse::<String>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let users_repo = UsersRepository::new(&state.db);
 
     let user_short = match users_repo.get_by_token(&token).await {
         Ok(u) => u,
-        Err(_) => return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiError {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(_) => {
+            return ApiResponse::<String>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
     match storage_service.remove_dir(dir_id).await {
-        Ok(_) => ApiResponse::Success {
-            data: "deleted".to_string(),
-        }
-            .into_response(),
+        Ok(_) => ApiResponse::Success { data: "deleted".to_string() },
         Err(msg) => ApiResponse::<String>::Error {
             error: ApiError { message: msg },
-        }
-            .into_response(),
+        },
     }
 }
 
@@ -314,39 +313,41 @@ pub async fn remove_directory(
         ("bearerAuth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn rename_directory(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(dir_id): Path<i64>,
     Json(payload): Json<DirRenameRequest>,
-) -> impl IntoResponse {
+) -> ApiResponse<DirDto> {
     let token_manager = TokenExtractManager::new(headers);
 
     let token = match token_manager.check_token_error() {
         Ok(t) => t,
-        Err((status, json_error)) => return (status, json_error).into_response(),
+        Err(_) => {
+            return ApiResponse::<DirDto>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let users_repo = UsersRepository::new(&state.db);
 
     let user_short = match users_repo.get_by_token(&token).await {
         Ok(u) => u,
-        Err(_) => return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiError {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(_) => {
+            return ApiResponse::<DirDto>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
     };
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
     match storage_service.rename_dir(dir_id, &payload.new_name).await {
-        Ok(data) => ApiResponse::Success { data }.into_response(),
-        Err(msg) => ApiResponse::<String>::Error {
+        Ok(data) => ApiResponse::Success { data },
+        Err(msg) => ApiResponse::<DirDto>::Error {
             error: ApiError { message: msg },
-        }
-            .into_response(),
+        },
     }
 }

@@ -32,7 +32,7 @@ impl StorageManager for Storage {
         let mut file_size: i64 = 0;
         let mut content_type: Option<String> = None;
         let mut hasher = Sha256::new();
-        let mut saved_path: Option<PathBuf> = None; // ← новая переменная для финального пути
+        let mut saved_path: Option<PathBuf> = None;
 
         while let Some(mut field) = multipart.next_field().await.map_err(|e| StorageError {
             operation: OP_MULTIPART.to_string(),

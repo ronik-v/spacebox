@@ -1,5 +1,5 @@
 use sqlx::{Error, PgPool, Row};
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 
 use crate::dto::storage::{DirDto, FileDto, TagDto, UserDirCreateResult};
 
@@ -45,7 +45,7 @@ impl<'a> StorageRepository<'a> {
         let dir_id: i64 = dir_row.get("id");
         let dir_name: String = dir_row.get("name");
         let dir_parent_id: Option<i64> = dir_row.get("parent_id");
-        let dir_created_at: DateTime<Utc> = dir_row.get("created_at");
+        let dir_created_at: NaiveDateTime = dir_row.get("created_at");
 
         let user_dir_row = sqlx::query(
             r#"
@@ -117,7 +117,7 @@ impl<'a> StorageRepository<'a> {
         let file_mime_type: Option<String> = file_row.get("mime_type");
         let file_storage_key: String = file_row.get("storage_key");
         let file_hash: String = file_row.get("hash");
-        let file_created_at: DateTime<Utc> = file_row.get("created_at");
+        let file_created_at: NaiveDateTime = file_row.get("created_at");
 
         sqlx::query(
             "INSERT INTO dir_files (user_dir_id, file_id) VALUES ($1, $2)"
@@ -183,13 +183,13 @@ impl<'a> StorageRepository<'a> {
         let file_mime_type: Option<String> = first.get("mime_type");
         let file_storage_key: String = first.get("storage_key");
         let file_hash: String = first.get("hash");
-        let file_created_at: DateTime<Utc> = first.get("created_at");
+        let file_created_at: NaiveDateTime = first.get("created_at");
 
         let mut tags = vec![];
         for row in rows {
             let tag_id: Option<i64> = row.get("tag_id");
             let tag_name: Option<String> = row.get("tag_name");
-            let tag_created_at: Option<DateTime<Utc>> = row.get("tag_created_at");
+            let tag_created_at: Option<NaiveDateTime> = row.get("tag_created_at");
 
             if let (Some(id), Some(name), Some(created)) = (tag_id, tag_name, tag_created_at) {
                 tags.push(TagDto { id, name, created_at: created });
@@ -257,94 +257,6 @@ impl<'a> StorageRepository<'a> {
             role: row.get("role"),
             created_at: row.get("created_at"),
         })
-    }
-
-    pub async fn get_directory_contents(&self, user_dir_id: i64) -> Result<(Vec<DirDto>, Vec<FileDto>), Error> {
-        let dirs_rows = sqlx::query(
-            r#"
-                SELECT
-                    d.id,
-                    ud.id AS user_dir_id,
-                    d.name,
-                    d.parent_id,
-                    ud.role,
-                    d.created_at
-                FROM dirs d
-                JOIN user_dirs ud ON d.id = ud.dir_id
-                WHERE ud.user_id = $1
-                  AND d.parent_id = (
-                      SELECT dir_id FROM user_dirs WHERE id = $2
-                  )
-                "#
-        )
-            .bind(self.user_id)
-            .bind(user_dir_id)
-            .fetch_all(self.db)
-            .await?;
-
-        let dirs: Vec<DirDto> = dirs_rows
-            .into_iter()
-            .map(|r| DirDto {
-                id: r.get("id"),
-                user_dir_id: r.get("user_dir_id"),
-                name: r.get("name"),
-                parent_id: r.get("parent_id"),
-                role: r.get("role"),
-                created_at: r.get("created_at"),
-            })
-            .collect();
-
-        let files_rows = sqlx::query(
-            r#"
-                SELECT
-                    f.id,
-                    f.name,
-                    f.size,
-                    f.mime_type,
-                    f.storage_key,
-                    f.hash,
-                    f.created_at,
-                    COALESCE(ARRAY_AGG(t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[]) AS tags
-                FROM files f
-                JOIN dir_files df ON f.id = df.file_id
-                LEFT JOIN file_tags ft ON f.id = ft.file_id
-                LEFT JOIN tags t ON ft.tag_id = t.id
-                WHERE df.user_dir_id = $1
-                GROUP BY f.id
-                "#
-        )
-            .bind(user_dir_id)
-            .fetch_all(self.db)
-            .await?;
-
-        let files: Vec<FileDto> = files_rows
-            .into_iter()
-            .map(|r| {
-                let tag_names: Vec<String> = r.get("tags");
-
-                let tags: Vec<TagDto> = tag_names
-                    .into_iter()
-                    .map(|name| TagDto {
-                        id: 0,
-                        name,
-                        created_at: Utc::now(),
-                    })
-                    .collect();
-
-                FileDto {
-                    id: r.get("id"),
-                    name: r.get("name"),
-                    size: r.get("size"),
-                    mime_type: r.get("mime_type"),
-                    storage_key: r.get("storage_key"),
-                    hash: r.get("hash"),
-                    created_at: r.get("created_at"),
-                    tags,
-                }
-            })
-            .collect();
-
-        Ok((dirs, files))
     }
 
     pub async fn get_user_root_dir_id(&self) -> Result<i64, Error> {
