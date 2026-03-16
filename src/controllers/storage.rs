@@ -69,6 +69,7 @@ pub struct UploadQuery {
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct DirCreateRequest {
     pub name: String,
+    pub parent_dir_id: Option<i64>
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -234,7 +235,7 @@ pub async fn create_directory(
 
     let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
 
-    match storage_service.create_dir(&payload.name).await {
+    match storage_service.create_dir(&payload.name, &payload.parent_dir_id).await {
         Ok(data) => ApiResponse::Success { data },
         Err(msg) => ApiResponse::<UserDirCreateResult>::Error {
             error: ApiError { message: msg },

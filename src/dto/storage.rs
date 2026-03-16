@@ -5,7 +5,6 @@ use utoipa::ToSchema;
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DirDto {
     pub id: i64,
-    pub user_dir_id: i64,
     pub name: String,
     pub parent_id: Option<i64>,
     pub role: String,
@@ -36,6 +35,5 @@ pub struct FileDto {
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct UserDirCreateResult {
-    pub user_dir_id: i64,
     pub dir: DirDto,
 }

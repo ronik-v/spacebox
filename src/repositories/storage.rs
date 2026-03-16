@@ -13,6 +13,16 @@ impl<'a> StorageRepository<'a> {
         Self { db, user_id }
     }
 
+    pub async fn get_user_dir_id(&self, dir_id: i64) -> Result<i64, Error> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT id FROM user_dirs WHERE dir_id = $1 AND user_id = $2"
+        )
+            .bind(dir_id)
+            .bind(self.user_id)
+            .fetch_one(self.db)
+            .await
+    }
+
     pub async fn create_directory(
         &self,
         name: &str,
@@ -59,13 +69,9 @@ impl<'a> StorageRepository<'a> {
             .fetch_one(self.db)
             .await?;
 
-        let user_dir_id: i64 = user_dir_row.get("id");
-
         Ok(UserDirCreateResult {
-            user_dir_id,
             dir: DirDto {
                 id: dir_id,
-                user_dir_id,
                 name: dir_name,
                 parent_id: dir_parent_id,
                 role: "OWNER".to_string(),
@@ -139,73 +145,44 @@ impl<'a> StorageRepository<'a> {
         })
     }
 
-    pub async fn get_file_by_storage_key(&self, storage_key: &str) -> Result<Option<FileDto>, Error> {
-        let rows = sqlx::query(
+    pub async fn get_directory_fs_path(&self, dir_id: i64) -> Result<String, Error> {
+        sqlx::query_scalar::<_, String>(
             r#"
-            SELECT
-                f.id,
-                f.name,
-                f.size,
-                f.mime_type,
-                f.storage_key,
-                f.hash,
-                f.created_at,
-                t.id AS tag_id,
-                t.name AS tag_name,
-                t.created_at AS tag_created_at
-            FROM files f
-            LEFT JOIN file_tags ft ON f.id = ft.file_id
-            LEFT JOIN tags t ON ft.tag_id = t.id
-            WHERE f.storage_key = $1
-              AND EXISTS (
-                  SELECT 1
-                  FROM dir_files df
-                  JOIN user_dirs ud ON df.user_dir_id = ud.id
-                  WHERE df.file_id = f.id
-                    AND ud.user_id = $2
-              )
-            ORDER BY t.name
+            WITH RECURSIVE dir_path AS (
+                SELECT d.id, d.name, d.parent_id, 0 AS level
+                FROM dirs d
+                JOIN user_dirs ud ON d.id = ud.dir_id
+                WHERE d.id = $1
+                  AND ud.user_id = $2
+                UNION ALL
+                SELECT d.id, d.name, d.parent_id, dp.level + 1
+                FROM dirs d
+                JOIN dir_path dp ON d.id = dp.parent_id
+            )
+            SELECT COALESCE(string_agg(name, '/' ORDER BY level DESC), '') AS path
+            FROM dir_path
             "#
         )
-            .bind(storage_key)
+            .bind(dir_id)
             .bind(self.user_id)
-            .fetch_all(self.db)
-            .await?;
+            .fetch_one(self.db)
+            .await
+    }
 
-        if rows.is_empty() {
-            return Ok(None);
-        }
-
-        let first = &rows[0];
-        let file_id: i64 = first.get("id");
-        let file_name: String = first.get("name");
-        let file_size: i64 = first.get("size");
-        let file_mime_type: Option<String> = first.get("mime_type");
-        let file_storage_key: String = first.get("storage_key");
-        let file_hash: String = first.get("hash");
-        let file_created_at: NaiveDateTime = first.get("created_at");
-
-        let mut tags = vec![];
-        for row in rows {
-            let tag_id: Option<i64> = row.get("tag_id");
-            let tag_name: Option<String> = row.get("tag_name");
-            let tag_created_at: Option<NaiveDateTime> = row.get("tag_created_at");
-
-            if let (Some(id), Some(name), Some(created)) = (tag_id, tag_name, tag_created_at) {
-                tags.push(TagDto { id, name, created_at: created });
-            }
-        }
-
-        Ok(Some(FileDto {
-            id: file_id,
-            name: file_name,
-            size: file_size,
-            mime_type: file_mime_type,
-            storage_key: file_storage_key,
-            hash: file_hash,
-            created_at: file_created_at,
-            tags,
-        }))
+    pub async fn get_file_storage_key(&self, file_id: i64) -> Result<Option<String>, Error> {
+        sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT f.storage_key
+            FROM files f
+            JOIN dir_files df ON f.id = df.file_id
+            JOIN user_dirs ud ON df.user_dir_id = ud.id
+            WHERE f.id = $1 AND ud.user_id = $2
+            "#
+        )
+            .bind(file_id)
+            .bind(self.user_id)
+            .fetch_optional(self.db)
+            .await
     }
 
     pub async fn delete_file_by_storage_key(&self, storage_key: &str) -> Result<(), Error> {
@@ -251,7 +228,6 @@ impl<'a> StorageRepository<'a> {
 
         Ok(DirDto {
             id: row.get("id"),
-            user_dir_id: row.get("user_dir_id"),
             name: row.get("name"),
             parent_id: row.get("parent_id"),
             role: row.get("role"),
@@ -271,46 +247,6 @@ impl<'a> StorageRepository<'a> {
         )
             .bind(self.user_id)
             .fetch_one(self.db)
-            .await
-    }
-
-    pub async fn get_directory_fs_path(&self, user_dir_id: i64) -> Result<String, Error> {
-        sqlx::query_scalar::<_, String>(
-            r#"
-            WITH RECURSIVE dir_path AS (
-                SELECT d.id, d.name, d.parent_id, 0 AS level
-                FROM dirs d
-                JOIN user_dirs ud ON d.id = ud.dir_id
-                WHERE ud.id = $1
-                  AND ud.user_id = $2
-                UNION ALL
-                SELECT d.id, d.name, d.parent_id, dp.level + 1
-                FROM dirs d
-                JOIN dir_path dp ON d.id = dp.parent_id
-            )
-            SELECT COALESCE(string_agg(name, '/' ORDER BY level DESC), '') AS path
-            FROM dir_path
-            "#
-        )
-            .bind(user_dir_id)
-            .bind(self.user_id)
-            .fetch_one(self.db)
-            .await
-    }
-
-    pub async fn get_file_storage_key(&self, file_id: i64) -> Result<Option<String>, Error> {
-        sqlx::query_scalar::<_, String>(
-            r#"
-            SELECT f.storage_key
-            FROM files f
-            JOIN dir_files df ON f.id = df.file_id
-            JOIN user_dirs ud ON df.user_dir_id = ud.id
-            WHERE f.id = $1 AND ud.user_id = $2
-            "#
-        )
-            .bind(file_id)
-            .bind(self.user_id)
-            .fetch_optional(self.db)
             .await
     }
 
