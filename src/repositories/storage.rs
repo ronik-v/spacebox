@@ -128,7 +128,7 @@ impl<'a> StorageRepository<'a> {
         sqlx::query(
             "INSERT INTO dir_files (user_dir_id, file_id) VALUES ($1, $2)"
         )
-            .bind(user_dir_id)
+            .bind(dir_id)
             .bind(file_id)
             .execute(self.db)
             .await?;
