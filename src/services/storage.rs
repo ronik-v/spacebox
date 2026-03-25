@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 use axum::extract::Multipart;
 use sqlx::PgPool;
+use crate::core::errors::storage::{DIR_WAS_NOT_FOUND, NO_DIRS_DATA};
 
 use crate::core::storage::manager::Storage;
 use crate::core::storage::traits::StorageManager;
 use crate::repositories::storage::StorageRepository;
 use crate::dto::storage::{DirDto, FileDto, UserDirCreateResult};
+use crate::responses::storage::DirObjectWithFilesNode;
 
 pub struct StorageService<'a> {
     user_id: i64,
@@ -24,10 +26,50 @@ impl<'a> StorageService<'a> {
         }
     }
 
+    pub async fn get_user_dirs_with_files(&self) -> Result<DirObjectWithFilesNode, String> {
+        let user_dirs = self.storage_repository.get_dirs_list_with_files().await.
+            map_err(|_| NO_DIRS_DATA.to_string())?;
+
+        let mut mapped_data = DirObjectWithFilesNode { id: 0, name: "".to_string(), files: None, sub_dir: None };
+        let mut dir_nodes: Vec<DirObjectWithFilesNode> = Vec::new();
+        let mut last_parent_id: i64 = -1;
+
+        for dir in &user_dirs {
+            if dir.parent_id.is_none() {
+                mapped_data.id = dir.dir_id;
+                mapped_data.name = (dir.dir_name).to_string();
+                mapped_data.files = dir.dir_files.as_ref().map(|j| j.0.clone());
+                mapped_data.sub_dir = Some(dir_nodes.clone());
+            } else {
+                if dir.parent_id < Some(last_parent_id) {
+                    let next_node = DirObjectWithFilesNode {
+                        id: dir.dir_id, name:
+                        (*dir.dir_name).to_string(),
+                        files: dir.dir_files.as_ref().map(|j| j.0.clone()),
+                        sub_dir: Some(dir_nodes.clone())
+                    };
+                    dir_nodes = vec![next_node];
+
+                } else {
+                    dir_nodes.push(DirObjectWithFilesNode {
+                        id: dir.dir_id,
+                        name: dir.dir_name.clone(),
+                        files: dir.dir_files.clone().map(|j| j.0),
+                        sub_dir: None,
+                    });
+                }
+
+                last_parent_id = dir.parent_id.unwrap();
+            }
+        }
+
+        Ok(mapped_data)
+    }
+
     pub async fn upload_file(&self, multipart: Multipart, _path_to_upload: &str, dir_id: i64) -> Result<FileDto, String> {
-        let user_dir_id = self.storage_repository.get_user_dir_id(dir_id)
+        let user_dir_id = self.storage_repository.get_user_dir_id(&dir_id)
             .await
-            .map_err(|_| "Данной папки у пользователя не существует".to_string())?;
+            .map_err(|_| DIR_WAS_NOT_FOUND.to_string())?;
 
         let fs_dir_path = self.storage_repository.get_directory_fs_path(dir_id)
             .await
@@ -76,7 +118,7 @@ impl<'a> StorageService<'a> {
 
     pub async fn create_dir(&self, name: &str, parent_dir_id: &Option<i64>) -> Result<UserDirCreateResult, String> {
         let parent_user_dir_id = match parent_dir_id {
-            Some(p) => self.storage_repository.get_user_dir_id(p.clone()).await
+            Some(p) => self.storage_repository.get_user_dir_id(p).await
                 .map_err(|_| "Родительская папка не найдена".to_string())?,
             None => self.storage_repository.get_user_root_dir_id().await.map_err(|e| e.to_string())?,
         };
@@ -101,7 +143,7 @@ impl<'a> StorageService<'a> {
     }
 
     pub async fn remove_dir(&self, dir_id: i64) -> Result<(), String> {
-        let user_dir_id = self.storage_repository.get_user_dir_id(dir_id)
+        let user_dir_id = self.storage_repository.get_user_dir_id(&dir_id)
             .await
             .map_err(|_| "Папка не найдена".to_string())?;
 
@@ -119,7 +161,7 @@ impl<'a> StorageService<'a> {
     }
 
     pub async fn rename_dir(&self, dir_id: i64, new_name: &str) -> Result<DirDto, String> {
-        let user_dir_id = self.storage_repository.get_user_dir_id(dir_id)
+        let user_dir_id = self.storage_repository.get_user_dir_id(&dir_id)
             .await
             .map_err(|_| "Папка не найдена".to_string())?;
 

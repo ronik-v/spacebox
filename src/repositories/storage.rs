@@ -1,7 +1,7 @@
 use sqlx::{Error, PgPool, Row};
 use chrono::NaiveDateTime;
 
-use crate::dto::storage::{DirDto, FileDto, TagDto, UserDirCreateResult};
+use crate::dto::storage::{DirDto, DirFilesDto, DirsListDto, FileDto, UserDirCreateResult};
 
 pub struct StorageRepository<'a> {
     db: &'a PgPool,
@@ -13,15 +13,61 @@ impl<'a> StorageRepository<'a> {
         Self { db, user_id }
     }
 
-    pub async fn get_user_dir_id(&self, dir_id: i64) -> Result<i64, Error> {
+    pub async fn get_user_dir_id(&self, dir_id: &i64) -> Result<i64, Error> {
         sqlx::query_scalar::<_, i64>(
             "SELECT id FROM user_dirs WHERE dir_id = $1 AND user_id = $2"
         )
-            .bind(dir_id)
+            .bind(*dir_id)
             .bind(self.user_id)
             .fetch_one(self.db)
             .await
     }
+
+    // IMPORTANT: ORDER BY parent_id DESC NULLS LAST
+    // is needed for the correct operation of the iterative tree construction below!
+    pub async fn get_dirs_list_with_files(&self) -> Result<Vec<DirsListDto>, Error> {
+        let dir_rows = sqlx::query(
+            r#"SELECT
+                ud.dir_id,
+                d.name AS dir_name,
+                d.parent_id,
+                d.created_at AS dir_created,
+                CASE
+                    WHEN MAX(f.id) IS NOT null THEN JSONB_AGG(JSONB_BUILD_OBJECT(
+                    'file_id', f.id, 'file_name', f.name, 'file_size', f.size,
+                    'file_path', f.storage_key, 'file_hash', f.hash, 'created_at', f.created_at
+                )) ELSE NULL END
+                AS dir_files
+            FROM user_dirs ud
+            JOIN dirs d ON ud.dir_id = d.id
+            LEFT JOIN dir_files df ON df.user_dir_id = ud.dir_id
+            LEFT JOIN files f ON f.id = df.file_id
+            WHERE ud.user_id = $1
+            GROUP BY
+                ud.dir_id,
+                d.name,
+                d.parent_id,
+                d.created_at
+            ORDER BY d.parent_id DESC NULLS LAST"#
+        )
+            .bind(self.user_id)
+            .fetch_all(self.db)
+            .await?;
+
+        let mut dirs: Vec<DirsListDto> = Vec::new();
+
+        for row in dir_rows {
+            dirs.push(DirsListDto {
+                dir_id: row.get("dir_id"),
+                dir_name: row.get("dir_name"),
+                parent_id: row.get("parent_id"),
+                dir_files: row.get("dir_files"),
+            });
+        }
+
+        Ok(dirs)
+    }
+
 
     pub async fn create_directory(
         &self,

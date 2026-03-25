@@ -1,7 +1,7 @@
 use axum::{
     extract::{State, Json, Query, Path, Multipart},
     http::HeaderMap,
-    routing::{post, delete, patch},
+    routing::{get, post, delete, patch},
     Router,
 };
 use serde::Deserialize;
@@ -15,12 +15,14 @@ use crate::{
     },
     dto::storage::{FileDto, UserDirCreateResult, DirDto},
     repositories::users::UsersRepository,
+    responses::storage::DirObjectWithFilesNode,
     services::storage::StorageService,
 };
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        crate::controllers::storage::get_user_dir_files,
         crate::controllers::storage::upload_file,
         crate::controllers::storage::remove_file,
         crate::controllers::storage::create_directory,
@@ -46,6 +48,7 @@ pub struct StorageApiDoc;
 
 pub fn storage_routes() -> Router<AppState> {
     Router::new()
+        .route("/api/v1/storage", get(get_user_dir_files))
         .route("/api/v1/storage/upload", post(upload_file))
         .route("/api/v1/storage/file/{file_id}", delete(remove_file))
         .route("/api/v1/storage/dir", post(create_directory))
@@ -190,6 +193,56 @@ pub async fn remove_file(
         },
     }
 }
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/storage",
+    tag = "storage",
+    responses(
+        (status = 200, description = "Успешное получение вложенной структуры файлов", body = ApiResponse<DirObjectWithFilesNode>),
+        (status = 401, description = "Не авторизован", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
+    )
+)]
+#[axum::debug_handler]
+pub async fn get_user_dir_files(
+    State(state): State<AppState>,
+    headers: HeaderMap
+) -> ApiResponse<DirObjectWithFilesNode> {
+    let token_manager = TokenExtractManager::new(headers);
+
+    let token = match token_manager.check_token_error() {
+        Ok(t) => t,
+        Err(_) => {
+            return ApiResponse::<DirObjectWithFilesNode>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
+    };
+
+    let users_repo = UsersRepository::new(&state.db);
+
+    let user_short = match users_repo.get_by_token(&token).await {
+        Ok(u) => u,
+        Err(_) => {
+            return ApiResponse::<DirObjectWithFilesNode>::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
+    };
+
+    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+
+    match storage_service.get_user_dirs_with_files().await {
+        Ok(data) => ApiResponse::Success { data },
+        Err(msg) => ApiResponse::<DirObjectWithFilesNode>::Error {
+            error: ApiError { message: msg },
+        },
+    }
+}
+
 
 #[utoipa::path(
     post,
