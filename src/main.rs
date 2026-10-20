@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 mod config;
 mod controllers;
 mod repositories;
@@ -6,8 +8,10 @@ mod core;
 mod models;
 mod responses;
 mod dto;
+mod utils;
 
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::process::exit;
 use std::sync::Arc;
 
 use axum::Router;
@@ -15,6 +19,7 @@ use anyhow::Result;
 use axum::http::{HeaderName, Method};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use axum::routing::get;
+use redis::{AsyncCommands, ConnectionLike};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 use tower_http::LatencyUnit;
@@ -30,6 +35,7 @@ use crate::core::database::connection::{create_connection_db, create_connection_
 use crate::core::security::SecurityAddon;
 
 use crate::core::state::AppState;
+use crate::utils::{is_db_alive, is_redis_alive};
 
 
 #[tokio::main]
@@ -42,8 +48,13 @@ async fn main() -> Result<()> {
         .init();
     // state params
     let cfg = config::AppConfig::from_env();
-    let db_connection = create_connection_db(&cfg).await?;
-    let redis_connection = create_connection_redis(&cfg).await?;
+    let db_connection = create_connection_db(&cfg).await.expect("Db connection error check .env");
+    // db check message
+    is_db_alive(&db_connection).await;
+
+    let mut redis_connection = create_connection_redis(&cfg).await.expect("Redis connection error check .env");
+    // redis connection check
+    is_redis_alive(&mut redis_connection).await;
 
     let app_state = AppState { cfg: Arc::new(cfg.clone()), db: db_connection, redis: Arc::new(redis_connection), storage_root: std::path::PathBuf::from(cfg.root_dir.as_str()) };
     let cors = CorsLayer::new()
