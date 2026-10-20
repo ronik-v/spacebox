@@ -13,6 +13,7 @@ mod utils;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use std::process::exit;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use axum::Router;
 use anyhow::Result;
@@ -35,7 +36,7 @@ use crate::core::database::connection::{create_connection_db, create_connection_
 use crate::core::security::SecurityAddon;
 
 use crate::core::state::AppState;
-use crate::utils::{is_db_alive, is_redis_alive};
+use crate::utils::{is_db_alive, is_redis_alive, start_watchdog};
 
 
 #[tokio::main]
@@ -48,13 +49,21 @@ async fn main() -> Result<()> {
         .init();
     // state params
     let cfg = config::AppConfig::from_env();
-    let db_connection = create_connection_db(&cfg).await.expect("Db connection error check .env");
-    // db check message
+
+    let startup_ok = start_watchdog("Try to start conn (Postgres/Redis)", 20);
+    tracing::info!("Connect to Postgres (run migrations)...");
+    let db_connection = create_connection_db(&cfg)
+        .await
+        .expect("Db connection error check .env");
     is_db_alive(&db_connection).await;
 
-    let mut redis_connection = create_connection_redis(&cfg).await.expect("Redis connection error check .env");
-    // redis connection check
+    tracing::info!("Try to connect Redis...");
+    let mut redis_connection = create_connection_redis(&cfg)
+        .await
+        .expect("Redis connection error check .env");
     is_redis_alive(&mut redis_connection).await;
+
+    startup_ok.store(true, Ordering::SeqCst);
 
     let app_state = AppState { cfg: Arc::new(cfg.clone()), db: db_connection, redis: Arc::new(redis_connection), storage_root: std::path::PathBuf::from(cfg.root_dir.as_str()) };
     let cors = CorsLayer::new()
@@ -84,7 +93,7 @@ async fn main() -> Result<()> {
 
     let ip: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let addr = SocketAddr::new(ip, 9099);
-    println!("Listening on http://{}", addr);
+    tracing::info!("Listening on http://{}", addr);
 
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app.into_make_service()).await?;
