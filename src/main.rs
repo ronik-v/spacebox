@@ -102,10 +102,16 @@ async fn main() -> Result<()> {
 
 #[derive(OpenApi)]
 #[openapi(
+    info(
+        title = "Spacebox API",
+        version = "0.2.0",
+        description = "API cloud service Spacebox"
+    ),
     paths(
         crate::controllers::auth::login,
         crate::controllers::auth::send_verification_code,
         crate::controllers::auth::confirm_registration,
+        crate::controllers::storage::get_user_dirs_structure,
         crate::controllers::storage::get_user_dir_files,
         crate::controllers::storage::upload_file,
         crate::controllers::storage::remove_file,

@@ -13,7 +13,7 @@ use crate::{
         state::AppState,
         token::TokenExtractManager,
     },
-    dto::storage::{FileDto, UserDirCreateResult, DirDto},
+    dto::storage::{FileDto, UserDirCreateResult, DirDto, UserDirsStructureWithFilesDto, SubDirsListDto},
     repositories::users::UsersRepository,
     responses::storage::DirObjectWithFilesNode,
     services::storage::StorageService,
@@ -22,6 +22,7 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        crate::controllers::storage::get_user_dirs_structure,
         crate::controllers::storage::get_user_dir_files,
         crate::controllers::storage::upload_file,
         crate::controllers::storage::remove_file,
@@ -31,6 +32,8 @@ use crate::{
     ),
     components(
         schemas(
+            UserDirsStructureWithFilesDto,
+            SubDirsListDto,
             UploadQuery,
             DirCreateRequest,
             DirRenameRequest,
@@ -48,6 +51,7 @@ pub struct StorageApiDoc;
 
 pub fn storage_routes() -> Router<AppState> {
     Router::new()
+        .route("/api/v1/storage/structure", get(get_user_dirs_structure))
         .route("/api/v1/storage", get(get_user_dir_files))
         .route("/api/v1/storage/upload", post(upload_file))
         .route("/api/v1/storage/file/{file_id}", delete(remove_file))
@@ -62,6 +66,11 @@ pub fn storage_routes() -> Router<AppState> {
 pub struct UploadForm {
     #[schema(format = Binary, content_media_type = "application/octet-stream")]
     pub file: String,
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct GetDirQuery {
+    pub dir_id: Option<i64>,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -193,6 +202,51 @@ pub async fn remove_file(
         },
     }
 }
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/storage/structure",
+    tag = "storage",
+    params(
+        ("dir_id" = Option<i64>, Query, description = "ID текущей директории. Если пустой или null — вернет корневую")
+    ),
+    responses(
+        (status = 200, description = "Успешное получение структуры текущей директории с файлами и поддиректориями на уровень ниже", body = ApiResponse<UserDirsStructureWithFilesDto>),
+        (status = 401, description = "Не авторизован", body = ApiError),
+        (status = 404, description = "Директория не найдена", body = ApiError)
+    ),
+    security(
+        ("bearerAuth" = [])
+    )
+)]
+#[axum::debug_handler]
+pub async fn get_user_dirs_structure(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<GetDirQuery>
+) -> ApiResponse<UserDirsStructureWithFilesDto> {
+    let token_manager = TokenExtractManager::new(headers);
+
+    let token = match token_manager.check_token_error() {
+        Ok(t) => t,
+        Err(_) => return ApiResponse::Error { error: ApiError { message: "Invalid or expired token".to_string() } },
+    };
+
+    let users_repo = UsersRepository::new(&state.db);
+
+    let user_short = match users_repo.get_by_token(&token).await {
+        Ok(u) => u,
+        Err(_) => return ApiResponse::Error { error: ApiError { message: "Invalid or expired token".to_string() } },
+    };
+
+    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+
+    match storage_service.get_dir_data_with_files(query.dir_id).await {
+        Ok(data) => ApiResponse::Success { data },
+        Err(msg) => ApiResponse::Error { error: ApiError { message: msg } },
+    }
+}
+
 
 #[utoipa::path(
     get,

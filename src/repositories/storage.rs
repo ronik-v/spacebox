@@ -1,7 +1,7 @@
 use sqlx::{Error, PgPool, Row};
 use chrono::NaiveDateTime;
 
-use crate::dto::storage::{DirDto, DirFilesDto, DirsListDto, FileDto, UserDirCreateResult};
+use crate::dto::storage::{DirDto, DirFilesDto, DirsListDto, FileDto, UserDirCreateResult, UserDirsStructureWithFilesDto};
 
 pub struct StorageRepository<'a> {
     db: &'a PgPool,
@@ -21,6 +21,63 @@ impl<'a> StorageRepository<'a> {
             .bind(self.user_id)
             .fetch_one(self.db)
             .await
+    }
+
+    pub async fn get_dir_data_with_files(&self, dir_id: Option<i64>) -> Result<Vec<UserDirsStructureWithFilesDto>, Error> {
+        // return root dir or sub_dir data
+        let dir_rows = sqlx::query(
+            r#"
+            SELECT
+                d.id AS dir_id,
+                d.name AS dir_name,
+                d.parent_id,
+                d.created_at AS dir_created,
+                (
+                    SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+                        'file_id', f.id,
+                        'file_name', f.name,
+                        'file_size', f.size,
+                        'file_path', f.storage_key,
+                        'file_hash', f.hash,
+                        'created_at', f.created_at
+                    ))
+                    FROM dir_files df
+                    JOIN files f ON f.id = df.file_id
+                    WHERE df.user_dir_id = ud.dir_id
+                ) AS dir_files,
+                (
+                    SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+                        'dir_id', sd.id,
+                        'dir_name', sd.name,
+                        'parent_id', sd.parent_id,
+                        'created_at', sd.created_at
+                    ))
+                    FROM dirs sd
+                    WHERE sd.parent_id = d.id
+                ) AS sub_dirs
+            FROM user_dirs ud
+            JOIN dirs d ON ud.dir_id = d.id
+            WHERE ud.user_id = $1
+              AND (d.id = $2 OR ($2 IS NULL AND d.parent_id IS NULL))
+            "#
+        )
+            .bind(self.user_id)
+            .bind(dir_id)
+            .fetch_all(self.db)
+            .await?;
+
+        let user_dirs_with_files: Vec<UserDirsStructureWithFilesDto> = dir_rows
+            .into_iter()
+            .map(|dir_object| UserDirsStructureWithFilesDto {
+                dir_id: dir_object.get("dir_id"),
+                dir_name: dir_object.get("dir_name"),
+                parent_id: dir_object.get("parent_id"),
+                dir_files: dir_object.get("dir_files"),
+                sub_dirs: dir_object.get("sub_dirs"),
+            })
+            .collect();
+
+        Ok(user_dirs_with_files)
     }
 
     // IMPORTANT: ORDER BY parent_id DESC NULLS LAST
@@ -67,7 +124,6 @@ impl<'a> StorageRepository<'a> {
 
         Ok(dirs)
     }
-
 
     pub async fn create_directory(
         &self,

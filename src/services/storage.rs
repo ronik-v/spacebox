@@ -6,7 +6,7 @@ use crate::core::errors::storage::{DIR_WAS_NOT_FOUND, NO_DIRS_DATA};
 use crate::core::storage::manager::Storage;
 use crate::core::storage::traits::StorageManager;
 use crate::repositories::storage::StorageRepository;
-use crate::dto::storage::{DirDto, FileDto, UserDirCreateResult};
+use crate::dto::storage::{DirDto, FileDto, UserDirCreateResult, UserDirsStructureWithFilesDto};
 use crate::responses::storage::DirObjectWithFilesNode;
 
 pub struct StorageService<'a> {
@@ -24,6 +24,20 @@ impl<'a> StorageService<'a> {
             storage_manager: Box::new(Storage::new(root_path.clone())),
             root_path,
         }
+    }
+
+    pub async fn get_dir_data_with_files(&self, dir_id: Option<i64>) -> Result<UserDirsStructureWithFilesDto, String> {
+        let dir_data_vec: Vec<UserDirsStructureWithFilesDto> = self.storage_repository
+            .get_dir_data_with_files(dir_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let dir_data = dir_data_vec
+            .into_iter()
+            .next()
+            .ok_or_else(|| DIR_WAS_NOT_FOUND.to_string())?;
+
+        Ok(dir_data)
     }
 
     pub async fn get_user_dirs_with_files(&self) -> Result<DirObjectWithFilesNode, String> {
