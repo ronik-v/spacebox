@@ -3,6 +3,9 @@ use axum::{
     routing::post,
     Router,
 };
+use axum::extract::Path;
+use axum::routing::delete;
+use http::HeaderMap;
 use utoipa::OpenApi;
 
 use crate::{
@@ -15,13 +18,16 @@ use crate::{
     services::{auth::AuthService, registration::RegistrationService},
     dto::users::{UserDto, UserTokensShortDto},
 };
+use crate::core::token::TokenExtractManager;
+use crate::repositories::users::UsersRepository;
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
         crate::controllers::auth::login,
         crate::controllers::auth::send_verification_code,
-        crate::controllers::auth::confirm_registration
+        crate::controllers::auth::confirm_registration,
+        crate::controllers::auth::refresh_auth,
     ),
     components(
         schemas(
@@ -45,6 +51,7 @@ pub fn auth_routes() -> Router<AppState> {
         .route("/api/v1/login", post(login))
         .route("/api/v1/register/send-code", post(send_verification_code))
         .route("/api/v1/register/confirm", post(confirm_registration))
+        .route("/api/v1/token/refresh/{user_id}", delete(refresh_auth))
 }
 
 #[utoipa::path(
@@ -107,4 +114,58 @@ pub async fn confirm_registration(
         payload.password,
         state,
     ).await
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/token/refresh/{user_id}",
+    tag = "auth",
+    params(
+        ("user_id" = i64, Path, description = "ID пользователя")
+    ),
+    responses(
+        (status = 200, description = "Успешно удалены старые токены и выданы новые", body = ApiResponse<UserOut>),
+        (status = 401, description = "Неавторизованный доступ", body = ApiResponse<ApiError>),
+        (status = 403, description = "Доступ запрещен (ID не совпадает)", body = ApiResponse<ApiError>),
+        (status = 500, description = "Ошибка сервера", body = ApiResponse<ApiError>)
+    ),
+    security(
+        ("bearerAuth" = [])
+    )
+)]
+#[axum::debug_handler]
+pub async fn refresh_auth(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(user_id): Path<i64>,
+) -> ApiResponse<UserOut> {
+    let token_manager = TokenExtractManager::new(headers);
+
+    let token = match token_manager.check_token_error() {
+        Ok(t) => t,
+        Err(_) => {
+            return ApiResponse::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
+    };
+
+    let users_repo = UsersRepository::new(&state.db);
+
+    let user_short = match users_repo.get_by_token(&token).await {
+        Ok(u) => u,
+        Err(_) => {
+            return ApiResponse::Error {
+                error: ApiError { message: "Invalid or expired token".to_string() },
+            };
+        }
+    };
+    // check that user id correct
+    if user_short.id != user_id {
+        return ApiResponse::Error {
+            error: ApiError { message: "Permission denied: access token owner mismatch".to_string() },
+        };
+    }
+
+    AuthService::refresh_token(user_id, state).await
 }

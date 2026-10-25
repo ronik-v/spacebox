@@ -111,6 +111,7 @@ async fn main() -> Result<()> {
         crate::controllers::auth::login,
         crate::controllers::auth::send_verification_code,
         crate::controllers::auth::confirm_registration,
+        crate::controllers::auth::refresh_auth,
         crate::controllers::storage::get_user_dirs_structure,
         crate::controllers::storage::get_user_dir_files,
         crate::controllers::storage::upload_file,

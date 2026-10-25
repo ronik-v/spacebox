@@ -60,4 +60,55 @@ impl AuthService {
             },
         }
     }
+    pub async fn refresh_token(user_id: i64, state: AppState) -> ApiResponse<UserOut> {
+        let repo = UsersRepository::new(&state.db);
+        // clear all user tokens and create new
+        match repo.get_user_by_id(user_id).await {
+            Ok(Some(user)) => {
+                match repo.remove_all_tokens(user_id).await {
+                    Ok(_) => {
+                        let token = get_auth_token();
+
+                        match repo.create_token(&user_id, &token).await {
+                            Ok(user_token) => {
+                                ApiResponse::Success {
+                                    data: UserOut {
+                                        user: UserDto {
+                                            id: user.id,
+                                            email: user.email,
+                                            created_at: user.created_at,
+                                        },
+                                        meta: UserTokensShortDto {
+                                            token: user_token.token,
+                                            created_at: user_token.created_at,
+                                        },
+                                    },
+                                }
+                            }
+                            Err(e) => ApiResponse::Error {
+                                error: crate::core::api::ApiError {
+                                    message: format!("{}: {}", FAILED_CREATE_TOKEN_ERROR, e),
+                                },
+                            },
+                        }
+                    }
+                    Err(e) => ApiResponse::Error {
+                        error: crate::core::api::ApiError {
+                            message: format!("{}: {}", DB_ERROR, e),
+                        },
+                    },
+                }
+            }
+            Ok(None) => ApiResponse::Error {
+                error: crate::core::api::ApiError {
+                    message: INVALID_CREDENTIALS_ERROR.to_string(),
+                },
+            },
+            Err(e) => ApiResponse::Error {
+                error: crate::core::api::ApiError {
+                    message: format!("{}: {}", DB_ERROR, e),
+                },
+            },
+        }
+    }
 }

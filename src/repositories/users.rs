@@ -29,9 +29,16 @@ impl<'a> UsersRepository<'a> {
             .await
     }
 
-    pub async fn get_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
+    pub async fn get_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
             .bind(email)
+            .fetch_optional(self.db)
+            .await
+    }
+
+    pub async fn get_user_by_id(&self, user_id: i64) -> Result<Option<User>, Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
             .fetch_optional(self.db)
             .await
     }
@@ -64,5 +71,15 @@ impl<'a> UsersRepository<'a> {
             .bind(token)
             .fetch_one(self.db)
             .await
+    }
+
+    pub async fn remove_all_tokens(&self, user_id: i64) -> Result<(), Error> {
+        sqlx::query(
+            "DELETE FROM user_tokens WHERE user_id = $1"
+        )
+            .bind(user_id)
+            .execute(self.db)
+            .await?;
+        Ok(())
     }
 }
