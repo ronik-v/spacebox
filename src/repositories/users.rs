@@ -19,12 +19,11 @@ impl<'a> UsersRepository<'a> {
             .await
     }
 
-    pub async fn get_by_email_password(&self, email: &String, password: &String) -> Result<Option<User>, Error> {
+    pub async fn get_by_email_password(&self, email: &String) -> Result<Option<User>, Error> {
         sqlx::query_as::<_, User>(
-            "SELECT * FROM users u WHERE u.email = $1 AND u.password = $2"
+            "SELECT * FROM users u WHERE u.email = $1"
         )
             .bind(email)
-            .bind(password)
             .fetch_optional(self.db)
             .await
     }

@@ -1,6 +1,7 @@
 use utoipa::{OpenApi, Modify};
 use utoipa::openapi::ComponentsBuilder;
 use utoipa::openapi::security::{SecurityScheme, HttpBuilder, HttpAuthScheme};
+use bcrypt::{hash, verify, DEFAULT_COST};
 
 pub struct SecurityAddon;
 
@@ -21,5 +22,21 @@ impl Modify for SecurityAddon {
                     .build(),
             );
         }
+    }
+}
+
+pub struct Password {
+    pub pass: String
+}
+
+impl Password {
+    pub fn new(pass: String) -> Self { Self { pass } }
+
+    pub fn hash(&self) -> String {
+        hash(self.pass.clone(), DEFAULT_COST).unwrap()
+    }
+
+    pub fn is_correct(&self, stored_hash: &str) -> bool {
+        verify(self.pass.clone(), stored_hash).unwrap_or(false)
     }
 }

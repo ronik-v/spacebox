@@ -1,5 +1,6 @@
 use crate::core::api::ApiResponse;
 use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, INVALID_CREDENTIALS_ERROR};
+use crate::core::security::Password;
 use crate::core::state::AppState;
 use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
@@ -17,9 +18,19 @@ impl AuthService {
     ) -> ApiResponse<UserOut> {
         let repo = UsersRepository::new(&state.db);
 
-        match repo.get_by_email_password(&email, &password).await {
+        match repo.get_by_email_password(&email).await {
             Ok(Some(user)) => {
                 let token = get_auth_token();
+                let password_manager = Password::new(password);
+                let is_correct_pass = password_manager.is_correct(&user.password);
+
+                if !is_correct_pass {
+                    return ApiResponse::Error {
+                        error: crate::core::api::ApiError {
+                            message: format!("{}", INVALID_CREDENTIALS_ERROR),
+                        },
+                    }
+                }
 
                 match repo.create_token(&user.id, &token).await {
                     Ok(user_token) => {

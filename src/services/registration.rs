@@ -2,6 +2,7 @@ use rand::{Rng, thread_rng};
 
 use crate::core::api::ApiResponse;
 use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, FAILED_CREATE_USER_ERROR, FAILED_SEND_CODE_ERROR, FAILED_STORE_CODE_ERROR, UNCORRECTED_VERIFICATION_CODE_ERROR, USER_IS_EXISTS_ERROR, VERIFICATION_ERROR};
+use crate::core::security::Password;
 use crate::core::state::AppState;
 use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
@@ -75,8 +76,11 @@ impl RegistrationService {
         match ver.is_correct_verification_code().await {
             Ok(true) => {
                 let repo = UsersRepository::new(&state.db);
+                // add user with hashed password
+                let password_manager = Password::new(password);
+                let hashed_password = password_manager.hash();
 
-                match repo.add(&email, &password).await {
+                match repo.add(&email, &hashed_password).await {
                     Ok(Some(user)) => {
                         let token = get_auth_token();
 
