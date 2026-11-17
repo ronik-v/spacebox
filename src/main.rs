@@ -36,7 +36,7 @@ use crate::core::database::connection::{create_connection_db, create_connection_
 use crate::core::security::SecurityAddon;
 
 use crate::core::state::AppState;
-use crate::utils::{is_db_alive, is_redis_alive, start_watchdog};
+use crate::utils::{init_admin, is_db_alive, is_redis_alive, start_watchdog};
 
 
 #[tokio::main]
@@ -64,6 +64,7 @@ async fn main() -> Result<()> {
     is_redis_alive(&mut redis_connection).await;
 
     startup_ok.store(true, Ordering::SeqCst);
+    init_admin(&db_connection).await;
 
     let app_state = AppState { cfg: Arc::new(cfg.clone()), db: db_connection, redis: Arc::new(redis_connection), storage_root: std::path::PathBuf::from(cfg.root_dir.as_str()) };
     let cors = CorsLayer::new()
@@ -104,7 +105,7 @@ async fn main() -> Result<()> {
 #[openapi(
     info(
         title = "Spacebox API",
-        version = "0.2.0",
+        version = "0.3.0",
         description = "API cloud service Spacebox"
     ),
     paths(

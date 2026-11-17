@@ -5,6 +5,7 @@ use std::time::Duration;
 use redis::{aio::ConnectionManager, cmd};
 use sqlx::PgPool;
 use tokio::time::timeout;
+use crate::core::security::AppAdmin;
 
 const CHECK_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -45,4 +46,10 @@ pub fn start_watchdog(what: &'static str, secs: u64) -> Arc<AtomicBool> {
         }
     });
     done
+}
+
+pub async fn init_admin(pool: &PgPool) {
+    // init base admin in app
+    let admin_manager = AppAdmin::new(pool);
+    admin_manager.create().await;
 }

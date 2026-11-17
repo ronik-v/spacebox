@@ -1,5 +1,4 @@
 use axum::Json;
-use rand::{RngCore, rngs::OsRng};
 use base64::{Engine as _, engine::general_purpose};
 use http::header::AUTHORIZATION;
 use http::{HeaderMap, StatusCode};
@@ -8,7 +7,7 @@ use crate::core::api::ApiError;
 
 pub fn get_auth_token() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
+    rand::fill(&mut bytes);
     general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 

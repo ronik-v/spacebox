@@ -139,7 +139,7 @@ pub async fn upload_file(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.upload_file(multipart, "", query.dir_id).await {
         Ok(data) => ApiResponse::Success { data },
@@ -193,7 +193,7 @@ pub async fn remove_file(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.remove_file(file_id).await {
         Ok(_) => ApiResponse::Success { data: "deleted".to_string() },
@@ -239,7 +239,7 @@ pub async fn get_user_dirs_structure(
         Err(_) => return ApiResponse::Error { error: ApiError { message: "Invalid or expired token".to_string() } },
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.get_dir_data_with_files(query.dir_id).await {
         Ok(data) => ApiResponse::Success { data },
@@ -287,7 +287,7 @@ pub async fn get_user_dir_files(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.get_user_dirs_with_files().await {
         Ok(data) => ApiResponse::Success { data },
@@ -340,7 +340,7 @@ pub async fn create_directory(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.create_dir(&payload.name, &payload.parent_dir_id).await {
         Ok(data) => ApiResponse::Success { data },
@@ -394,7 +394,7 @@ pub async fn remove_directory(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.remove_dir(dir_id).await {
         Ok(_) => ApiResponse::Success { data: "deleted".to_string() },
@@ -450,7 +450,7 @@ pub async fn rename_directory(
         }
     };
 
-    let storage_service = StorageService::new(user_short.id, &state.db, state.storage_root.clone());
+    let storage_service = StorageService::new(user_short.unwrap().id, &state.db, state.storage_root.clone());
 
     match storage_service.rename_dir(dir_id, &payload.new_name).await {
         Ok(data) => ApiResponse::Success { data },

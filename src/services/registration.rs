@@ -1,7 +1,7 @@
 use rand::{Rng, thread_rng};
 
 use crate::core::api::ApiResponse;
-use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, FAILED_CREATE_USER_ERROR, FAILED_SEND_CODE_ERROR, FAILED_STORE_CODE_ERROR, UNCORRECTED_VERIFICATION_CODE_ERROR, USER_IS_EXISTS_ERROR, VERIFICATION_ERROR};
+use crate::core::errors::users::{DB_ERROR, FAILED_CREATE_TOKEN_ERROR, FAILED_CREATE_USER_ERROR, FAILED_SEND_CODE_ERROR, FAILED_STORE_CODE_ERROR, UNCORRECTED_VERIFICATION_CODE_ERROR, USER_BASE_ROLE_IS_NOT_EXIST, USER_IS_EXISTS_ERROR, VERIFICATION_ERROR};
 use crate::core::security::Password;
 use crate::core::state::AppState;
 use crate::core::token::get_auth_token;
@@ -83,12 +83,43 @@ impl RegistrationService {
                 match repo.add(&email, &hashed_password).await {
                     Ok(Some(user)) => {
                         let token = get_auth_token();
+                        let user_role = "user";
+                        match repo.get_role_id_by_name(&user_role).await {
+                            Ok(role_id) => {
+                                // add base role
+                                if let Err(e) = repo.add_role(user.id, role_id).await {
+                                    return ApiResponse::Error {
+                                        error: crate::core::api::ApiError {
+                                            message: format!("{}: {}", DB_ERROR, e),
+                                        },
+                                    };
+                                }
+                            }
+                            Err(e) => {
+                                return ApiResponse::Error {
+                                    error: crate::core::api::ApiError {
+                                        message: format!("{}: {}", USER_BASE_ROLE_IS_NOT_EXIST, e),
+                                    },
+                                };
+                            }
+                        }
+
+                        let roles = match repo.get_roles_by_user_id(user.id).await {
+                            Ok(r) => r,
+                            Err(e) => {
+                                tracing::error!("get roles failed: {e}");
+                                return ApiResponse::Error {
+                                    error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
+                                };
+                            }
+                        };
 
                         match repo.create_token(&user.id, &token).await {
                             Ok(user_token) => {
                                 let user_dto = UserDto {
                                     id: user.id,
                                     email: user.email,
+                                    roles,
                                     created_at: user.created_at,
                                 };
 

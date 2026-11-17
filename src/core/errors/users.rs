@@ -7,3 +7,4 @@ pub const FAILED_CREATE_USER_ERROR: &str = "Не удалось создать �
 pub const FAILED_CREATE_TOKEN_ERROR: &str = "Не удалось создать токен";
 pub const DB_ERROR: &str = "Ошибка базы данных";
 pub const VERIFICATION_ERROR: &str = "Ошибка верификации";
+pub const USER_BASE_ROLE_IS_NOT_EXIST: &str = "Роли пользователей не созданы";

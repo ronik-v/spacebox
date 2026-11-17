@@ -161,7 +161,7 @@ pub async fn refresh_auth(
         }
     };
     // check that user id correct
-    if user_short.id != user_id {
+    if user_short.unwrap().id != user_id {
         return ApiResponse::Error {
             error: ApiError { message: "Permission denied: access token owner mismatch".to_string() },
         };

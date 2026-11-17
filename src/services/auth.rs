@@ -18,7 +18,7 @@ impl AuthService {
     ) -> ApiResponse<UserOut> {
         let repo = UsersRepository::new(&state.db);
 
-        match repo.get_by_email_password(&email).await {
+        match repo.get_by_email(&email).await {
             Ok(Some(user)) => {
                 let token = get_auth_token();
                 let password_manager = Password::new(password);
@@ -31,12 +31,22 @@ impl AuthService {
                         },
                     }
                 }
+                let roles = match repo.get_roles_by_user_id(user.id).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("get roles failed: {e}");
+                        return ApiResponse::Error {
+                            error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
+                        };
+                    }
+                };
 
                 match repo.create_token(&user.id, &token).await {
                     Ok(user_token) => {
                         let user_dto = UserDto {
                             id: user.id,
                             email: user.email,
+                            roles,
                             created_at: user.created_at,
                         };
 
@@ -80,6 +90,16 @@ impl AuthService {
                     Ok(_) => {
                         let token = get_auth_token();
 
+                        let roles = match repo.get_roles_by_user_id(user.id).await {
+                            Ok(r) => r,
+                            Err(e) => {
+                                tracing::error!("get roles failed: {e}");
+                                return ApiResponse::Error {
+                                    error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
+                                };
+                            }
+                        };
+
                         match repo.create_token(&user_id, &token).await {
                             Ok(user_token) => {
                                 ApiResponse::Success {
@@ -87,6 +107,7 @@ impl AuthService {
                                         user: UserDto {
                                             id: user.id,
                                             email: user.email,
+                                            roles,
                                             created_at: user.created_at,
                                         },
                                         meta: UserTokensShortDto {

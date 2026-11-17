@@ -23,3 +23,10 @@ pub struct UserTokens {
     pub token: String,
     pub created_at: NaiveDateTime
 }
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct UserWithRoles {
+    pub id: i64,
+    pub email: String,
+    pub roles: Vec<String>,
+}
