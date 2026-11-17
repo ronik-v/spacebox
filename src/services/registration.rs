@@ -8,6 +8,7 @@ use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
 use crate::repositories::users::UsersRepository;
 use crate::responses::users::UserOut;
+use crate::services::roles::RolesService;
 use crate::services::verification::RegistrationVerification;
 
 
@@ -103,15 +104,9 @@ impl RegistrationService {
                                 };
                             }
                         }
-
-                        let roles = match repo.get_roles_by_user_id(user.id).await {
+                        let roles = match RolesService::new(&state.db).get_user_roles(user.id).await {
                             Ok(r) => r,
-                            Err(e) => {
-                                tracing::error!("get roles failed: {e}");
-                                return ApiResponse::Error {
-                                    error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
-                                };
-                            }
+                            Err(e) => return ApiResponse::Error { error: e },
                         };
 
                         match repo.create_token(&user.id, &token).await {

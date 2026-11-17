@@ -30,3 +30,24 @@ impl<T: serde::Serialize> IntoResponse for ApiResponse<T> {
         }
     }
 }
+
+impl ApiError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self { message: message.into() }
+    }
+}
+
+impl<T> ApiResponse<T> {
+    pub fn error(message: impl Into<String>) -> Self {
+        ApiResponse::Error { error: ApiError::new(message) }
+    }
+}
+
+impl<T> From<Result<T, ApiError>> for ApiResponse<T> {
+    fn from(r: Result<T, ApiError>) -> Self {
+        match r {
+            Ok(data) => ApiResponse::Success { data },
+            Err(error) => ApiResponse::Error { error },
+        }
+    }
+}

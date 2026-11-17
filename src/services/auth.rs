@@ -6,6 +6,7 @@ use crate::core::token::get_auth_token;
 use crate::dto::users::{UserDto, UserTokensShortDto};
 use crate::repositories::users::UsersRepository;
 use crate::responses::users::UserOut;
+use crate::services::roles::RolesService;
 
 
 pub struct AuthService;
@@ -31,14 +32,9 @@ impl AuthService {
                         },
                     }
                 }
-                let roles = match repo.get_roles_by_user_id(user.id).await {
+                let roles = match RolesService::new(&state.db).get_user_roles(user.id).await {
                     Ok(r) => r,
-                    Err(e) => {
-                        tracing::error!("get roles failed: {e}");
-                        return ApiResponse::Error {
-                            error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
-                        };
-                    }
+                    Err(e) => return ApiResponse::Error { error: e },
                 };
 
                 match repo.create_token(&user.id, &token).await {
@@ -89,15 +85,9 @@ impl AuthService {
                 match repo.remove_all_tokens(user_id).await {
                     Ok(_) => {
                         let token = get_auth_token();
-
-                        let roles = match repo.get_roles_by_user_id(user.id).await {
+                        let roles = match RolesService::new(&state.db).get_user_roles(user.id).await {
                             Ok(r) => r,
-                            Err(e) => {
-                                tracing::error!("get roles failed: {e}");
-                                return ApiResponse::Error {
-                                    error: crate::core::api::ApiError { message: DB_ERROR.to_string() },
-                                };
-                            }
+                            Err(e) => return ApiResponse::Error { error: e },
                         };
 
                         match repo.create_token(&user_id, &token).await {
